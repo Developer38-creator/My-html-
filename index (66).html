@@ -1,0 +1,342 @@
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>3D Rotating Image Gallery</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link
+    rel="stylesheet"
+    href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.3/css/all.min.css"
+  />
+  <style>
+    body, html {
+      margin: 0; padding: 0; height: 100%; background-color: #000000;
+      overflow: hidden;
+      font-family: 'Inter', sans-serif;
+    }
+    #canvas-container {
+      position: fixed;
+      top: 0; left: 0; width: 100%; height: 100%;
+      touch-action: none;
+      user-select: none;
+      -webkit-user-select: none;
+      -moz-user-select: none;
+      -ms-user-select: none;
+    }
+    #ui-panel {
+      position: fixed;
+      bottom: 0; left: 0; width: 100%;
+      background: rgba(0,0,0,0.8);
+      backdrop-filter: blur(10px);
+      color: white;
+      padding: 0.75rem 1rem;
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      gap: 0.75rem;
+      z-index: 10;
+    }
+    #file-input {
+      display: none;
+    }
+    .btn {
+      background-color: #1f2937;
+      border-radius: 0.375rem;
+      padding: 0.5rem 1rem;
+      cursor: pointer;
+      transition: background-color 0.2s ease;
+      user-select: none;
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+    }
+    .btn:hover {
+      background-color: #374151;
+    }
+    #image-count-input {
+      width: 4.5rem;
+      background-color: #111827;
+      border: none;
+      border-radius: 0.375rem;
+      color: white;
+      padding: 0.4rem 0.6rem;
+      font-size: 1rem;
+      text-align: center;
+    }
+    #image-count-input:focus {
+      outline: 2px solid #3b82f6;
+      outline-offset: 2px;
+      background-color: #1e293b;
+    }
+    #loading-text {
+      position: fixed;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      color: white;
+      font-weight: 600;
+      font-size: 1.25rem;
+      z-index: 20;
+      user-select: none;
+      display: none;
+    }
+  </style>
+</head>
+<body>
+  <div id="canvas-container"></div>
+
+  <div id="ui-panel" aria-label="Controls">
+    <label for="file-input" class="btn" role="button" tabindex="0" aria-label="Upload images">
+      <i class="fas fa-upload"></i> Upload Images
+    </label>
+    <input
+      type="file"
+      id="file-input"
+      accept="image/*"
+      multiple
+      aria-describedby="upload-desc"
+    />
+    <span id="upload-desc" class="sr-only">Select multiple images to upload</span>
+
+    <label for="image-count-input" class="sr-only">Number of images to display</label>
+    <input
+      type="number"
+      id="image-count-input"
+      min="1"
+      max="500"
+      value="50"
+      aria-live="polite"
+      aria-label="Number of images to display"
+      title="Number of images to display"
+    />
+    <span class="text-white select-none">images displayed</span>
+  </div>
+
+  <div id="loading-text" role="alert" aria-live="assertive">Loading images...</div>
+
+  <script src="https://cdn.jsdelivr.net/npm/three@0.152.2/build/three.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/three@0.152.2/examples/js/controls/OrbitControls.min.js"></script>
+  <script>
+    (() => {
+      const MAX_IMAGES = 500;
+      const container = document.getElementById('canvas-container');
+      const fileInput = document.getElementById('file-input');
+      const imageCountInput = document.getElementById('image-count-input');
+      const loadingText = document.getElementById('loading-text');
+
+      let scene, camera, renderer, controls;
+      let images = [];
+      let imageMeshes = [];
+      let group;
+      let animationId;
+
+      // Initialize Three.js scene
+      function init() {
+        scene = new THREE.Scene();
+
+        camera = new THREE.PerspectiveCamera(
+          60,
+          window.innerWidth / window.innerHeight,
+          0.1,
+          2000
+        );
+        camera.position.set(0, 0, 600);
+
+        renderer = new THREE.WebGLRenderer({ antialias: true, alpha: false });
+        renderer.setSize(window.innerWidth, window.innerHeight);
+        renderer.setClearColor(0x000000, 1);
+        container.appendChild(renderer.domElement);
+
+        controls = new THREE.OrbitControls(camera, renderer.domElement);
+        controls.enableDamping = true;
+        controls.dampingFactor = 0.05;
+        controls.minDistance = 100;
+        controls.maxDistance = 1500;
+        controls.enablePan = true;
+
+        group = new THREE.Group();
+        scene.add(group);
+
+        window.addEventListener('resize', onWindowResize, false);
+      }
+
+      function onWindowResize() {
+        camera.aspect = window.innerWidth / window.innerHeight;
+        camera.updateProjectionMatrix();
+
+        renderer.setSize(window.innerWidth, window.innerHeight);
+      }
+
+      // Create a circular arrangement of images in 3D space
+      function createImageMeshes(displayCount) {
+        // Clear previous meshes
+        imageMeshes.forEach((mesh) => {
+          group.remove(mesh);
+          if (mesh.material.map) mesh.material.map.dispose();
+          mesh.material.dispose();
+          mesh.geometry.dispose();
+        });
+        imageMeshes = [];
+
+        if (images.length === 0) return;
+
+        // Clamp displayCount
+        displayCount = Math.min(displayCount, images.length);
+
+        // Arrange images on a large circle in 3D space
+        // We'll place them on a circle on the XZ plane, with some vertical offset variation for depth
+        const radius = 400;
+        const angleStep = (2 * Math.PI) / displayCount;
+
+        for (let i = 0; i < displayCount; i++) {
+          const angle = i * angleStep;
+
+          // Create texture from image
+          const texture = new THREE.Texture(images[i]);
+          texture.needsUpdate = true;
+          texture.minFilter = THREE.LinearFilter;
+          texture.magFilter = THREE.LinearFilter;
+
+          // Create a plane geometry for each image
+          // We'll keep images square with size 80x80 units
+          const geometry = new THREE.PlaneGeometry(80, 80);
+
+          // Use MeshBasicMaterial with texture and transparency
+          const material = new THREE.MeshBasicMaterial({
+            map: texture,
+            transparent: true,
+            side: THREE.DoubleSide,
+          });
+
+          const mesh = new THREE.Mesh(geometry, material);
+
+          // Position on circle
+          mesh.position.set(
+            radius * Math.cos(angle),
+            50 * Math.sin(angle * 3), // vertical oscillation for depth variation
+            radius * Math.sin(angle)
+          );
+
+          // Rotate the plane so it faces outward from the circle center
+          mesh.lookAt(0, 0, 0);
+          mesh.rotateY(Math.PI); // flip to face outward
+
+          group.add(mesh);
+          imageMeshes.push(mesh);
+        }
+      }
+
+      // Animate rotation of the group and render scene
+      function animate() {
+        animationId = requestAnimationFrame(animate);
+
+        // Slowly rotate the group around Y axis
+        group.rotation.y += 0.0025;
+
+        controls.update();
+        renderer.render(scene, camera);
+      }
+
+      // Load images from user files
+      function loadImagesFromFiles(files) {
+        loadingText.style.display = 'block';
+
+        const fileArray = Array.from(files).slice(0, MAX_IMAGES);
+        const loadedImages = [];
+        let loadedCount = 0;
+
+        fileArray.forEach((file, index) => {
+          const reader = new FileReader();
+          reader.onload = function (e) {
+            const img = new Image();
+            img.onload = function () {
+              loadedImages[index] = img;
+              loadedCount++;
+              if (loadedCount === fileArray.length) {
+                images = loadedImages.filter(Boolean);
+                updateDisplayCount();
+                loadingText.style.display = 'none';
+              }
+            };
+            img.onerror = function () {
+              loadedCount++;
+              if (loadedCount === fileArray.length) {
+                images = loadedImages.filter(Boolean);
+                updateDisplayCount();
+                loadingText.style.display = 'none';
+              }
+            };
+            img.src = e.target.result;
+          };
+          reader.readAsDataURL(file);
+        });
+      }
+
+      // Update the number of images displayed based on input
+      function updateDisplayCount() {
+        let count = parseInt(imageCountInput.value, 10);
+        if (isNaN(count) || count < 1) count = 1;
+        if (count > images.length) count = images.length;
+        imageCountInput.value = count;
+        createImageMeshes(count);
+      }
+
+      // Initialize with placeholder images if no user images loaded
+      function loadPlaceholderImages() {
+        loadingText.style.display = 'block';
+        const placeholderCount = 50;
+        const placeholderImages = [];
+        let loadedCount = 0;
+
+        for (let i = 0; i < placeholderCount; i++) {
+          const img = new Image();
+          img.crossOrigin = "anonymous";
+          img.alt = `Placeholder image of abstract colorful pattern number ${i + 1}`;
+          img.src = `https://placehold.co/128x128/png?text=Img+${i + 1}&font=roboto&bg=111111&fg=eeeeee`;
+          img.onload = () => {
+            loadedCount++;
+            if (loadedCount === placeholderCount) {
+              images = placeholderImages;
+              updateDisplayCount();
+              loadingText.style.display = 'none';
+            }
+          };
+          img.onerror = () => {
+            loadedCount++;
+            if (loadedCount === placeholderCount) {
+              images = placeholderImages;
+              updateDisplayCount();
+              loadingText.style.display = 'none';
+            }
+          };
+          placeholderImages.push(img);
+        }
+      }
+
+      // Event listeners
+      fileInput.addEventListener('change', (e) => {
+        if (e.target.files.length > 0) {
+          loadImagesFromFiles(e.target.files);
+        }
+      });
+
+      imageCountInput.addEventListener('input', () => {
+        updateDisplayCount();
+      });
+
+      // Keyboard accessibility for upload label
+      document.querySelector('label[for="file-input"]').addEventListener('keydown', (e) => {
+        if (e.key === 'Enter' || e.key === ' ') {
+          e.preventDefault();
+          fileInput.click();
+        }
+      });
+
+      // Initialize app
+      init();
+      loadPlaceholderImages();
+      animate();
+    })();
+  </script>
+</body>
+</html>
