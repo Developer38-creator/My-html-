@@ -1,0 +1,473 @@
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Global Time Zone App</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link
+    rel="stylesheet"
+    href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.3/css/all.min.css"
+  />
+  <link
+    href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600&display=swap"
+    rel="stylesheet"
+  />
+  <style>
+    body {
+      font-family: 'Inter', sans-serif;
+    }
+  </style>
+</head>
+<body class="bg-gray-50 dark:bg-gray-900 text-gray-900 dark:text-gray-100 min-h-screen flex flex-col">
+  <header class="bg-white dark:bg-gray-800 shadow p-4 flex items-center justify-between sticky top-0 z-20">
+    <h1 class="text-2xl font-semibold flex items-center space-x-2">
+      <i class="fas fa-globe-americas text-blue-600 dark:text-blue-400"></i>
+      <span>Global Time Zone</span>
+    </h1>
+    <button
+      id="toggleDarkMode"
+      aria-label="Toggle Dark Mode"
+      class="text-gray-600 dark:text-gray-300 hover:text-blue-600 dark:hover:text-blue-400 transition"
+    >
+      <i class="fas fa-moon"></i>
+    </button>
+  </header>
+
+  <main class="flex-grow max-w-4xl mx-auto w-full px-4 py-6 flex flex-col">
+    <section class="mb-6">
+      <label for="searchCity" class="block mb-2 font-semibold text-lg">Add a city or location</label>
+      <div class="relative">
+        <input
+          type="text"
+          id="searchCity"
+          placeholder="Search for a city or country"
+          class="w-full rounded-md border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 py-2 pl-10 pr-4 focus:outline-none focus:ring-2 focus:ring-blue-500"
+          autocomplete="off"
+          aria-autocomplete="list"
+          aria-controls="searchResults"
+          aria-expanded="false"
+          aria-haspopup="listbox"
+        />
+        <i class="fas fa-search absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 dark:text-gray-500"></i>
+        <ul
+          id="searchResults"
+          role="listbox"
+          class="absolute z-30 w-full bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-700 rounded-md max-h-60 overflow-y-auto mt-1 hidden"
+          tabindex="-1"
+        ></ul>
+      </div>
+    </section>
+
+    <section class="mb-6 flex items-center justify-between">
+      <h2 class="text-xl font-semibold">Your Clocks</h2>
+      <div class="flex items-center space-x-4">
+        <label for="timeFormat" class="font-medium">Time Format:</label>
+        <select
+          id="timeFormat"
+          class="rounded-md border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 py-1 px-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
+          aria-label="Select time format"
+        >
+          <option value="24">24-hour</option>
+          <option value="12">12-hour (AM/PM)</option>
+        </select>
+      </div>
+    </section>
+
+    <section id="clocksList" class="space-y-4 overflow-y-auto max-h-[60vh]">
+      <!-- Clocks will be dynamically inserted here -->
+    </section>
+  </main>
+
+  <footer class="bg-white dark:bg-gray-800 shadow-inner p-4 text-center text-sm text-gray-600 dark:text-gray-400">
+    &copy; 2024 Global Time Zone App
+  </footer>
+
+  <script>
+    // List of cities with their IANA time zone identifiers and country flags (emoji)
+    // This list is a sample of 50 cities worldwide for demonstration and search.
+    const cities = [
+      { name: "New York, USA", timezone: "America/New_York", flag: "🇺🇸" },
+      { name: "Los Angeles, USA", timezone: "America/Los_Angeles", flag: "🇺🇸" },
+      { name: "Chicago, USA", timezone: "America/Chicago", flag: "🇺🇸" },
+      { name: "London, UK", timezone: "Europe/London", flag: "🇬🇧" },
+      { name: "Paris, France", timezone: "Europe/Paris", flag: "🇫🇷" },
+      { name: "Berlin, Germany", timezone: "Europe/Berlin", flag: "🇩🇪" },
+      { name: "Moscow, Russia", timezone: "Europe/Moscow", flag: "🇷🇺" },
+      { name: "Tokyo, Japan", timezone: "Asia/Tokyo", flag: "🇯🇵" },
+      { name: "Seoul, South Korea", timezone: "Asia/Seoul", flag: "🇰🇷" },
+      { name: "Beijing, China", timezone: "Asia/Shanghai", flag: "🇨🇳" },
+      { name: "Sydney, Australia", timezone: "Australia/Sydney", flag: "🇦🇺" },
+      { name: "Melbourne, Australia", timezone: "Australia/Melbourne", flag: "🇦🇺" },
+      { name: "Delhi, India", timezone: "Asia/Kolkata", flag: "🇮🇳" },
+      { name: "Mumbai, India", timezone: "Asia/Kolkata", flag: "🇮🇳" },
+      { name: "Dubai, UAE", timezone: "Asia/Dubai", flag: "🇦🇪" },
+      { name: "Cairo, Egypt", timezone: "Africa/Cairo", flag: "🇪🇬" },
+      { name: "Johannesburg, South Africa", timezone: "Africa/Johannesburg", flag: "🇿🇦" },
+      { name: "São Paulo, Brazil", timezone: "America/Sao_Paulo", flag: "🇧🇷" },
+      { name: "Buenos Aires, Argentina", timezone: "America/Argentina/Buenos_Aires", flag: "🇦🇷" },
+      { name: "Mexico City, Mexico", timezone: "America/Mexico_City", flag: "🇲🇽" },
+      { name: "Toronto, Canada", timezone: "America/Toronto", flag: "🇨🇦" },
+      { name: "Vancouver, Canada", timezone: "America/Vancouver", flag: "🇨🇦" },
+      { name: "Singapore, Singapore", timezone: "Asia/Singapore", flag: "🇸🇬" },
+      { name: "Bangkok, Thailand", timezone: "Asia/Bangkok", flag: "🇹🇭" },
+      { name: "Istanbul, Turkey", timezone: "Europe/Istanbul", flag: "🇹🇷" },
+      { name: "Rome, Italy", timezone: "Europe/Rome", flag: "🇮🇹" },
+      { name: "Madrid, Spain", timezone: "Europe/Madrid", flag: "🇪🇸" },
+      { name: "Amsterdam, Netherlands", timezone: "Europe/Amsterdam", flag: "🇳🇱" },
+      { name: "Zurich, Switzerland", timezone: "Europe/Zurich", flag: "🇨🇭" },
+      { name: "Lisbon, Portugal", timezone: "Europe/Lisbon", flag: "🇵🇹" },
+      { name: "Helsinki, Finland", timezone: "Europe/Helsinki", flag: "🇫🇮" },
+      { name: "Oslo, Norway", timezone: "Europe/Oslo", flag: "🇳🇴" },
+      { name: "Stockholm, Sweden", timezone: "Europe/Stockholm", flag: "🇸🇪" },
+      { name: "Warsaw, Poland", timezone: "Europe/Warsaw", flag: "🇵🇱" },
+      { name: "Athens, Greece", timezone: "Europe/Athens", flag: "🇬🇷" },
+      { name: "Kuala Lumpur, Malaysia", timezone: "Asia/Kuala_Lumpur", flag: "🇲🇾" },
+      { name: "Jakarta, Indonesia", timezone: "Asia/Jakarta", flag: "🇮🇩" },
+      { name: "Lagos, Nigeria", timezone: "Africa/Lagos", flag: "🇳🇬" },
+      { name: "Nairobi, Kenya", timezone: "Africa/Nairobi", flag: "🇰🇪" },
+      { name: "Honolulu, USA", timezone: "Pacific/Honolulu", flag: "🇺🇸" },
+      { name: "Anchorage, USA", timezone: "America/Anchorage", flag: "🇺🇸" },
+      { name: "Reykjavik, Iceland", timezone: "Atlantic/Reykjavik", flag: "🇮🇸" },
+      { name: "Auckland, New Zealand", timezone: "Pacific/Auckland", flag: "🇳🇿" },
+      { name: "Buenos Aires, Argentina", timezone: "America/Argentina/Buenos_Aires", flag: "🇦🇷" },
+      { name: "Caracas, Venezuela", timezone: "America/Caracas", flag: "🇻🇪" },
+      { name: "Tehran, Iran", timezone: "Asia/Tehran", flag: "🇮🇷" },
+      { name: "Baghdad, Iraq", timezone: "Asia/Baghdad", flag: "🇮🇶" },
+      { name: "Riyadh, Saudi Arabia", timezone: "Asia/Riyadh", flag: "🇸🇦" },
+      { name: "Hanoi, Vietnam", timezone: "Asia/Ho_Chi_Minh", flag: "🇻🇳" },
+      { name: "Manila, Philippines", timezone: "Asia/Manila", flag: "🇵🇭" },
+      { name: "Lima, Peru", timezone: "America/Lima", flag: "🇵🇪" }
+    ];
+
+    // Utility: debounce function for search input
+    function debounce(func, wait) {
+      let timeout;
+      return function (...args) {
+        clearTimeout(timeout);
+        timeout = setTimeout(() => func.apply(this, args), wait);
+      };
+    }
+
+    // Store user clocks in localStorage
+    const STORAGE_KEY = "global-timezone-clocks";
+    const FORMAT_KEY = "global-timezone-timeformat";
+
+    // Load saved clocks or default to current location
+    let clocks = JSON.parse(localStorage.getItem(STORAGE_KEY)) || [];
+    let timeFormat = localStorage.getItem(FORMAT_KEY) || "24";
+
+    // Detect user's current timezone and add if no clocks saved
+    if (clocks.length === 0) {
+      const userTZ = Intl.DateTimeFormat().resolvedOptions().timeZone;
+      const userCity = cities.find((c) => c.timezone === userTZ);
+      if (userCity) {
+        clocks.push(userCity);
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(clocks));
+      } else {
+        // fallback if user's timezone not in list
+        clocks.push({ name: userTZ, timezone: userTZ, flag: "🌐" });
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(clocks));
+      }
+    }
+
+    // Elements
+    const searchInput = document.getElementById("searchCity");
+    const searchResults = document.getElementById("searchResults");
+    const clocksList = document.getElementById("clocksList");
+    const timeFormatSelect = document.getElementById("timeFormat");
+    const toggleDarkModeBtn = document.getElementById("toggleDarkMode");
+
+    // Initialize time format select
+    timeFormatSelect.value = timeFormat;
+
+    // Dark mode toggle
+    function setDarkMode(enabled) {
+      if (enabled) {
+        document.documentElement.classList.add("dark");
+        localStorage.setItem("global-timezone-darkmode", "true");
+        toggleDarkModeBtn.innerHTML = '<i class="fas fa-sun"></i>';
+      } else {
+        document.documentElement.classList.remove("dark");
+        localStorage.setItem("global-timezone-darkmode", "false");
+        toggleDarkModeBtn.innerHTML = '<i class="fas fa-moon"></i>';
+      }
+    }
+    // Load dark mode preference
+    const darkModePref = localStorage.getItem("global-timezone-darkmode");
+    if (darkModePref === "true") {
+      setDarkMode(true);
+    } else {
+      setDarkMode(false);
+    }
+    toggleDarkModeBtn.addEventListener("click", () => {
+      setDarkMode(!document.documentElement.classList.contains("dark"));
+    });
+
+    // Format date and time for a given timezone and format
+    function formatDateTime(date, timezone, format24) {
+      const optionsDate = { year: "numeric", month: "short", day: "numeric", timeZone: timezone };
+      const optionsTime = {
+        hour: "numeric",
+        minute: "numeric",
+        second: "numeric",
+        hour12: !format24,
+        timeZone: timezone,
+      };
+      const dateStr = new Intl.DateTimeFormat(undefined, optionsDate).format(date);
+      const timeStr = new Intl.DateTimeFormat(undefined, optionsTime).format(date);
+      return { dateStr, timeStr };
+    }
+
+    // Render clocks list
+    function renderClocks() {
+      clocksList.innerHTML = "";
+      clocks.forEach((city, index) => {
+        const clockId = `clock-${index}`;
+        const container = document.createElement("article");
+        container.setAttribute("draggable", "true");
+        container.setAttribute("aria-label", `Clock for ${city.name}`);
+        container.className =
+          "bg-white dark:bg-gray-800 rounded-lg shadow p-4 flex items-center justify-between space-x-4 cursor-move select-none";
+
+        // Left: Flag and city name
+        const leftDiv = document.createElement("div");
+        leftDiv.className = "flex items-center space-x-3 min-w-0";
+
+        const flagSpan = document.createElement("span");
+        flagSpan.className = "text-3xl select-text";
+        flagSpan.textContent = city.flag;
+
+        const cityName = document.createElement("h3");
+        cityName.className = "font-semibold text-lg truncate select-text";
+        cityName.textContent = city.name;
+
+        leftDiv.appendChild(flagSpan);
+        leftDiv.appendChild(cityName);
+
+        // Middle: Date and time
+        const middleDiv = document.createElement("div");
+        middleDiv.className = "flex flex-col items-end min-w-[120px]";
+
+        const dateSpan = document.createElement("time");
+        dateSpan.className = "text-sm text-gray-500 dark:text-gray-400 select-text";
+        dateSpan.id = `${clockId}-date`;
+
+        const timeSpan = document.createElement("time");
+        timeSpan.className = "text-xl font-mono font-semibold select-text";
+        timeSpan.id = `${clockId}-time`;
+
+        middleDiv.appendChild(dateSpan);
+        middleDiv.appendChild(timeSpan);
+
+        // Right: Remove button
+        const removeBtn = document.createElement("button");
+        removeBtn.className =
+          "text-red-500 hover:text-red-700 dark:hover:text-red-400 transition p-2 rounded focus:outline-none focus:ring-2 focus:ring-red-500";
+        removeBtn.setAttribute("aria-label", `Remove ${city.name} from clocks`);
+        removeBtn.innerHTML = '<i class="fas fa-trash-alt"></i>';
+        removeBtn.addEventListener("click", () => {
+          clocks.splice(index, 1);
+          saveClocks();
+          renderClocks();
+        });
+
+        container.appendChild(leftDiv);
+        container.appendChild(middleDiv);
+        container.appendChild(removeBtn);
+
+        // Drag and drop handlers for reordering
+        container.addEventListener("dragstart", (e) => {
+          e.dataTransfer.setData("text/plain", index);
+          e.dataTransfer.effectAllowed = "move";
+          container.classList.add("opacity-50");
+        });
+        container.addEventListener("dragend", () => {
+          container.classList.remove("opacity-50");
+        });
+        container.addEventListener("dragover", (e) => {
+          e.preventDefault();
+          e.dataTransfer.dropEffect = "move";
+          container.classList.add("ring-2", "ring-blue-500");
+        });
+        container.addEventListener("dragleave", () => {
+          container.classList.remove("ring-2", "ring-blue-500");
+        });
+        container.addEventListener("drop", (e) => {
+          e.preventDefault();
+          container.classList.remove("ring-2", "ring-blue-500");
+          const draggedIndex = Number(e.dataTransfer.getData("text/plain"));
+          if (draggedIndex === index) return;
+          const draggedItem = clocks[draggedIndex];
+          clocks.splice(draggedIndex, 1);
+          clocks.splice(index, 0, draggedItem);
+          saveClocks();
+          renderClocks();
+        });
+
+        clocksList.appendChild(container);
+      });
+    }
+
+    // Save clocks to localStorage
+    function saveClocks() {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(clocks));
+    }
+
+    // Update all clocks every second
+    function updateClocks() {
+      const now = new Date();
+      clocks.forEach((city, index) => {
+        const { dateStr, timeStr } = formatDateTime(now, city.timezone, timeFormat === "24");
+        const dateElem = document.getElementById(`clock-${index}-date`);
+        const timeElem = document.getElementById(`clock-${index}-time`);
+        if (dateElem) dateElem.textContent = dateStr;
+        if (timeElem) timeElem.textContent = timeStr;
+      });
+    }
+
+    // Search functionality
+    function searchCities(query) {
+      if (!query) return [];
+      const lowerQuery = query.toLowerCase();
+      return cities.filter((city) => city.name.toLowerCase().includes(lowerQuery));
+    }
+
+    // Render search results
+    function renderSearchResults(results) {
+      searchResults.innerHTML = "";
+      if (results.length === 0) {
+        const li = document.createElement("li");
+        li.className = "p-2 text-gray-500 dark:text-gray-400 select-none";
+        li.textContent = "No results found";
+        searchResults.appendChild(li);
+        return;
+      }
+      results.forEach((city, i) => {
+        const li = document.createElement("li");
+        li.className =
+          "p-2 cursor-pointer hover:bg-blue-100 dark:hover:bg-blue-700 rounded flex items-center space-x-2";
+        li.setAttribute("role", "option");
+        li.setAttribute("id", `search-result-${i}`);
+
+        const flagSpan = document.createElement("span");
+        flagSpan.className = "text-2xl select-text";
+        flagSpan.textContent = city.flag;
+
+        const nameSpan = document.createElement("span");
+        nameSpan.className = "select-text truncate";
+        nameSpan.textContent = city.name;
+
+        li.appendChild(flagSpan);
+        li.appendChild(nameSpan);
+
+        li.addEventListener("click", () => {
+          addCityToClocks(city);
+          clearSearch();
+          searchInput.focus();
+        });
+
+        searchResults.appendChild(li);
+      });
+    }
+
+    // Clear search input and results
+    function clearSearch() {
+      searchInput.value = "";
+      searchResults.innerHTML = "";
+      searchResults.classList.add("hidden");
+      searchInput.setAttribute("aria-expanded", "false");
+    }
+
+    // Add city to clocks if not already added
+    function addCityToClocks(city) {
+      if (clocks.some((c) => c.timezone === city.timezone)) {
+        alert(`${city.name} is already in your clocks.`);
+        return;
+      }
+      clocks.push(city);
+      saveClocks();
+      renderClocks();
+    }
+
+    // Handle search input changes with debounce
+    const handleSearchInput = debounce(() => {
+      const query = searchInput.value.trim();
+      if (query.length === 0) {
+        searchResults.classList.add("hidden");
+        searchInput.setAttribute("aria-expanded", "false");
+        return;
+      }
+      const results = searchCities(query);
+      renderSearchResults(results);
+      searchResults.classList.remove("hidden");
+      searchInput.setAttribute("aria-expanded", "true");
+    }, 250);
+
+    searchInput.addEventListener("input", handleSearchInput);
+
+    // Close search results on outside click
+    document.addEventListener("click", (e) => {
+      if (!searchResults.contains(e.target) && e.target !== searchInput) {
+        searchResults.classList.add("hidden");
+        searchInput.setAttribute("aria-expanded", "false");
+      }
+    });
+
+    // Keyboard navigation for search results
+    let focusedIndex = -1;
+    searchInput.addEventListener("keydown", (e) => {
+      const items = searchResults.querySelectorAll("li[role='option']");
+      if (searchResults.classList.contains("hidden") || items.length === 0) return;
+
+      if (e.key === "ArrowDown") {
+        e.preventDefault();
+        focusedIndex = (focusedIndex + 1) % items.length;
+        items.forEach((item, i) => {
+          if (i === focusedIndex) {
+            item.classList.add("bg-blue-200", "dark:bg-blue-600");
+            item.scrollIntoView({ block: "nearest" });
+            item.setAttribute("aria-selected", "true");
+          } else {
+            item.classList.remove("bg-blue-200", "dark:bg-blue-600");
+            item.setAttribute("aria-selected", "false");
+          }
+        });
+      } else if (e.key === "ArrowUp") {
+        e.preventDefault();
+        focusedIndex = (focusedIndex - 1 + items.length) % items.length;
+        items.forEach((item, i) => {
+          if (i === focusedIndex) {
+            item.classList.add("bg-blue-200", "dark:bg-blue-600");
+            item.scrollIntoView({ block: "nearest" });
+            item.setAttribute("aria-selected", "true");
+          } else {
+            item.classList.remove("bg-blue-200", "dark:bg-blue-600");
+            item.setAttribute("aria-selected", "false");
+          }
+        });
+      } else if (e.key === "Enter") {
+        e.preventDefault();
+        if (focusedIndex >= 0 && focusedIndex < items.length) {
+          items[focusedIndex].click();
+          focusedIndex = -1;
+        }
+      } else if (e.key === "Escape") {
+        clearSearch();
+        focusedIndex = -1;
+      }
+    });
+
+    // Handle time format change
+    timeFormatSelect.addEventListener("change", () => {
+      timeFormat = timeFormatSelect.value;
+      localStorage.setItem(FORMAT_KEY, timeFormat);
+      updateClocks();
+    });
+
+    // Initial render
+    renderClocks();
+    updateClocks();
+    setInterval(updateClocks, 1000);
+  </script>
+</body>
+</html>
